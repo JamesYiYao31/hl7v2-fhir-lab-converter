@@ -1,66 +1,98 @@
-with open("samples/input/valid_basic_oru.hl7","r") as file:
-    content = file.read()
-    segments = content.split("\n")
-    separated = []
-    results = []
+def read_hl7_file(path):
+    with open(path,"r") as file:
+        return file.read()
+
+def split_message(text):
+    segmented_fields = []
+    segments = text.splitlines()
     for i in segments:
         if "|" in i:
-            separated.append(i.split("|"))
-    for k in separated:
-        if k[0] == "MSH":
-            message_type = k[8].split("^")
-            msh_segment = {
-                "Sending Application": k[2],
-                "Sending Facility": k[3],
-                "Receiving Application": k[4],
-                "Receiving Facility" : k[5],
-                "Message Date/Time" : k[6],
-                "Message Type" : message_type[0],
-                "Trigger Event" : message_type[1],
-                "Message Control ID" : k[9],
-                "Processing ID" : k[10],
-                "HL7 Version" : k[11]
-            }
-            
-    for x in separated:
-        if x[0] == "PID":
-            name = x[5].split("^")
-            pid_segment = {
-                "Patient ID": x[3],
-                "Patient First Name": name[1],
-                "Patient Last Name": name[0],
-                "Date of Birth": x[7],
-                "Sex": x[8]
-                }
-    for y in separated:
-        if y[0] == "OBR":
-            panel = y[4].split("^")
-            obr_segment = {
-                "Placer Order Number" : y[2],
-                "Filler Order Number" : y[3],
-                "Panel Code" : panel[0],
-                "Panel Name" : panel[1],
-                "Observation Date" : y[7]
-            }
-    for j in separated:
-        if j[0] == "OBX":
-            analyte = j[3].split("^")
-            obx_segment = {
-                "Data Type" : j[2],
+            segmented_fields.append(i.split("|"))
+    return segmented_fields
+
+def find_segment(segments,name):
+    for j in segments:
+        if j[0] == name:
+            return j
+    return None
+
+def extract_msh(segments):
+    msh_fields = find_segment(segments,"MSH")
+    if msh_fields is None:
+        return None
+    message_type = msh_fields[8].split("^")
+    return {
+        "Sending Application": msh_fields[2],
+        "Sending Facility": msh_fields[3],
+        "Receiving Application": msh_fields[4],
+        "Receiving Facility" : msh_fields[5],
+        "Message Date/Time" : msh_fields[6],
+        "Message Type" : message_type[0],
+        "Trigger Event" : message_type[1],
+        "Message Control ID" : msh_fields[9],
+        "Processing ID" : msh_fields[10],
+        "HL7 Version" : msh_fields[11]
+        }
+
+def extract_pid(segments):
+    pid_fields = find_segment(segments,"PID")
+    if pid_fields is None:
+        return None
+    name = pid_fields[5].split("^")
+    return {
+        "Patient ID": pid_fields[3],
+        "Patient First Name": name[1],
+        "Patient Last Name": name[0],
+        "Date of Birth": pid_fields[7],
+        "Sex": pid_fields[8]
+        }
+
+def extract_obr(segments):
+    obr_fields = find_segment(segments,"OBR")
+    if obr_fields is None:
+        return None
+    panel = obr_fields[4].split("^")
+    return {
+        "Placer Order Number" : obr_fields[2],
+        "Filler Order Number" : obr_fields[3],
+        "Panel Code" : panel[0],
+        "Panel Name" : panel[1],
+        "Observation Date" : obr_fields[7]
+        }
+    
+def extract_obx_results(segments):
+    obx_results = []
+    for i in segments:
+        if i[0] == "OBX":
+            analyte = i[3].split("^")
+            obx_result = {
+                "Data Type" : i[2],
                 "Test Symbol" : analyte[0],
                 "Test Name" : analyte[1],
-                "Test Result" : j[5],
-                "Test Unit" : j[6],
-                "Test Reference Range": j[7],
-                "Abnormal Flag" : j[8],
-                "Result Status": j[11]
-            }
-            results.append(obx_segment)
-  
-laboratory_message = {
-    "Message" : msh_segment,
-    "Patient" : pid_segment,
-    "Order" : obr_segment,
-    "Results" : results
-}
-print(laboratory_message)
+                "Test Result" : i[5],
+                "Test Unit" : i[6],
+                "Test Reference Range": i[7],
+                "Abnormal Flag" : i[8],
+                "Result Status": i[11]
+                }
+            obx_results.append(obx_result)
+    return obx_results
+
+def parse_hl7_message(text):
+    separated = split_message(text)    
+    msh_segment = extract_msh(separated)
+    pid_segment = extract_pid(separated)
+    obr_segment = extract_obr(separated)
+    results = extract_obx_results(separated)
+    return {
+        "Message" : msh_segment,
+        "Patient" : pid_segment,
+        "Order" : obr_segment,
+        "Results" : results
+        }
+    
+if __name__ == "__main__":
+    content = read_hl7_file("samples/input/valid_basic_oru.hl7")
+    laboratory_message = parse_hl7_message(content)
+    print(laboratory_message)
+    
