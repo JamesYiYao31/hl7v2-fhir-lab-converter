@@ -16,64 +16,70 @@ def find_segment(segments,name):
             return j
     return None
 
+def get_field(fields,index):
+    if len(fields) > index:
+        return fields[index]
+    else:
+        return ""
+
 def extract_msh(segments):
     msh_fields = find_segment(segments,"MSH")
     if msh_fields is None:
         return None
-    message_type = msh_fields[8].split("^")
+    message_type = get_field(msh_fields,8).split("^")
     return {
-        "Sending Application": msh_fields[2],
-        "Sending Facility": msh_fields[3],
-        "Receiving Application": msh_fields[4],
-        "Receiving Facility" : msh_fields[5],
-        "Message Date/Time" : msh_fields[6],
-        "Message Type" : message_type[0],
-        "Trigger Event" : message_type[1],
-        "Message Control ID" : msh_fields[9],
-        "Processing ID" : msh_fields[10],
-        "HL7 Version" : msh_fields[11]
+        "Sending Application": get_field(msh_fields,2),
+        "Sending Facility": get_field(msh_fields,3),
+        "Receiving Application": get_field(msh_fields,4),
+        "Receiving Facility" : get_field(msh_fields,5),
+        "Message Date/Time" : get_field(msh_fields,6),
+        "Message Type" : get_field(message_type,0),
+        "Trigger Event" : get_field(message_type,1),
+        "Message Control ID" : get_field(msh_fields,9),
+        "Processing ID" : get_field(msh_fields,10),
+        "HL7 Version" : get_field(msh_fields,11)
         }
 
 def extract_pid(segments):
     pid_fields = find_segment(segments,"PID")
     if pid_fields is None:
         return None
-    name = pid_fields[5].split("^")
+    name = get_field(pid_fields,5).split("^")
     return {
-        "Patient ID": pid_fields[3],
-        "Patient First Name": name[1],
-        "Patient Last Name": name[0],
-        "Date of Birth": pid_fields[7],
-        "Sex": pid_fields[8]
+        "Patient ID": get_field(pid_fields,3),
+        "Patient First Name": get_field(name,1),
+        "Patient Last Name": get_field(name,0),
+        "Date of Birth": get_field(pid_fields,7),
+        "Sex": get_field(pid_fields,8)
         }
 
 def extract_obr(segments):
     obr_fields = find_segment(segments,"OBR")
     if obr_fields is None:
         return None
-    panel = obr_fields[4].split("^")
+    panel = get_field(obr_fields,4).split("^")
     return {
-        "Placer Order Number" : obr_fields[2],
-        "Filler Order Number" : obr_fields[3],
-        "Panel Code" : panel[0],
-        "Panel Name" : panel[1],
-        "Observation Date" : obr_fields[7]
+        "Placer Order Number" : get_field(obr_fields,2),
+        "Filler Order Number" : get_field(obr_fields,3),
+        "Panel Code" : get_field(panel,0),
+        "Panel Name" : get_field(panel,1),
+        "Observation Date" : get_field(obr_fields,7)
         }
     
 def extract_obx_results(segments):
     obx_results = []
-    for i in segments:
-        if i[0] == "OBX":
-            analyte = i[3].split("^")
+    for obx_fields in segments:
+        if obx_fields[0] == "OBX":
+            analyte = get_field(obx_fields,3).split("^")
             obx_result = {
-                "Data Type" : i[2],
-                "Test Symbol" : analyte[0],
-                "Test Name" : analyte[1],
-                "Test Result" : i[5],
-                "Test Unit" : i[6],
-                "Test Reference Range": i[7],
-                "Abnormal Flag" : i[8],
-                "Result Status": i[11]
+                "Data Type" : get_field(obx_fields,2),
+                "Test Symbol" : get_field(analyte,0),
+                "Test Name" : get_field(analyte,1),
+                "Test Result" : get_field(obx_fields,5),
+                "Test Unit" : get_field(obx_fields,6),
+                "Test Reference Range": get_field(obx_fields,7),
+                "Abnormal Flag" : get_field(obx_fields,8),
+                "Result Status": get_field(obx_fields,11)
                 }
             obx_results.append(obx_result)
     return obx_results
@@ -90,9 +96,25 @@ def parse_hl7_message(text):
         "Order" : obr_segment,
         "Results" : results
         }
-    
+
+
+def validate_message(laboratory_message):
+    problems = []
+    if laboratory_message["Patient"] is None:
+        problems.append('Missing PID segment')
+    else:
+        patient = laboratory_message["Patient"]
+        required = ["Patient ID", "Patient First Name", "Patient Last Name", "Date of Birth", "Sex"]
+        for field in required:
+            if not patient[field].strip():
+                problems.append(f"Missing {field}")
+    return problems
+        
+
 if __name__ == "__main__":
     content = read_hl7_file("samples/input/valid_basic_oru.hl7")
     laboratory_message = parse_hl7_message(content)
     print(laboratory_message)
-    
+
+
+print(parse_hl7_message("|"))
